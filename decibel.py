@@ -1,9 +1,12 @@
+"""UTF-8"""
 """Python3.11.4"""
+"""decibel_v0.3"""
 """前期导入"""
 import keyboard
 import datetime
 import pyaudio
 import time
+import json
 import numpy as np
 # from tkinter import Tk, Label
 import matplotlib.pyplot as plt
@@ -79,7 +82,7 @@ def get_average_volume(data,rms_Magnification):
 #     return volume * 10 / (2.0 ** 15)  # Normalize to approximately dBFS scale
     
 
-def update_meter(increase):
+def update_meter(increase,step,start_time,color):
     data = stream.read(CHUNK_SIZE)
     # print(data)
     level = smooth_volume(get_average_volume(np.frombuffer(data, dtype=np.int16),rms_Magnification))
@@ -96,23 +99,73 @@ def update_meter(increase):
     # ytime = int(time.strftime('%M%S', time.localtime(time.time())))
     ytime = int(M + S)
     print(ytime)
+
+    # # 设置参考区域
+    # plt.axhspan(ymin=y_min,ymax=y_max, facecolor='y')
     
     x.append(ytime)# 添加i到x轴的数据中
     y.append(level + increase)# 添加i的平方到y轴的数据中
     plt.clf()  # 清除之前画的图
     print(x,y)
+    
+    # 设置参考区域
+    plt.axhspan(ymin=y_min,ymax=y_max, facecolor=color)
+    # plt.axhline(y=y_min)
+
+    plt.axhline(y=y_min,c = 'r')
+
+    # plt.ylabel("当前分贝："+str(int(level+increase)),loc='top')
+    plt.title("当前分贝："+str(int(level+increase)))
     plt.plot(x, y)  # 画出当前x列表和y列表中的值的图形
+    
+    # plt.figure()
+    # current_figure = plt.gcf()  # gcf() 获取当前figure
+    # current_figure.canvas.set_window_title('New Window Title')  # 设置窗口标题
     plt.pause(0.01)  # 暂停一段时间，不然画的太快会卡住显示不出来
     plt.ioff()  # 关闭画图窗口
-    time.sleep(1)
+    time.sleep(step)
 
-# 获取重要参数设置
-rms_Magnification = int(input("rms_Magnification:"))
-increase = int(input("increase:"))
-# stop_time = int(input("stop_time:H/M"))
+# 使用中文
+plt.rcParams['font.sans-serif']=['SimHei']
+
+# 获取修改权限
+if str(input("Enter the administrator password or press any key to continue:")) == "3231106963":
+    # 获取重要参数设置
+    rms_Magnification = int(input("rms_Magnification:"))
+    increase = int(input("increase:"))
+    stop_time_m = int(input("stop_time_m(M/S):"))
+    stop_time_e = int(input("stop_time_e(M/S):"))
+    step = float(input("Time step:"))
+    y_min = int(input("Y_min:"))
+    y_max = int(input("Y_max:"))
+    color = str(input("color"))
+    data_main = {
+        'rms_Magnification':rms_Magnification,
+        'increase':increase,
+        'stop_time_m':stop_time_m,
+        'stop_time_e':stop_time_e,
+        'step':step,
+        'y_min':y_min,
+        'y_max':y_max,
+        'color':color,
+        }
+    with open('data.json', 'w') as f:
+        json.dump(data_main, f)
+
+else:
+    with open('data.json', 'r') as f:
+        data = json.load(f)
+    rms_Magnification = data['rms_Magnification']
+    increase = data['increase']
+    stop_time_m = int(data['stop_time_m'])
+    stop_time_e = int(data['stop_time_e'])
+    step = data['step']
+    y_min  = data['y_min']
+    y_max  = data['y_max']
+    color = data['color']
+
+start_time = int(time.strftime('%M%S', time.localtime(time.time())))
 # now_time = 0
-
-
 
 # 计算每个采样的浮点值
 bytes_per_sample = FORMAT // 8
@@ -123,13 +176,22 @@ x = []
 y = []
  
 # 创建绘制实时损失的动态窗口
+plt.figure('分贝仪')
 plt.ion()
+
+
+# # 更新图表视图
+# plt.draw()
+
 # # 在主程序开始时立即启动更新循环
-while keyboard.is_pressed("esc") != True:
-    update_meter(increase)
-# while now_time != stop_time or keyboard.is_pressed("esc") != True:
+# while keyboard.is_pressed("esc") != True:
 #     update_meter(increase)
-#     now_time = int(time.strftime('%H%M',time.localtime(time.time())))
+if int(time.strftime('%H', time.localtime(time.time()))) < 12:
+    stop_time = stop_time_m
+else:
+    stop_time = stop_time_e
+while stop_time != int(time.strftime('%M%S', time.localtime(time.time()))) :
+    update_meter(increase,step,start_time,color)
     
 now=datetime.datetime.now()
 plt.savefig(now.strftime("%Y-%m-%d_%H-%M-%S") + '.png', dpi=300)  # 保存为PNG格式
